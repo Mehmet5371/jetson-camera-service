@@ -1,0 +1,46 @@
+[Unit]
+Description=Jetson Camera Data Collection Service (backend + dashboard)
+Documentation=file:///mnt/recordings/jetson-camera-service/README.md
+After=network-online.target
+Wants=network-online.target
+# /mnt/recordings /etc/fstab'da UUID ile "nofail" olarak tanımlı (bkz.
+# Faz 1). RequiresMountsFor systemd'nin bu path gerçekten mount olana
+# kadar servisi başlatmamasını sağlar - SSD takılı değilse servis
+# başlamaz, SD karta yanlışlıkla yazma riski oluşmaz.
+RequiresMountsFor=/mnt/recordings
+
+[Service]
+Type=simple
+User=jetcam
+Group=jetcam
+WorkingDirectory=/mnt/recordings/jetson-camera-service/backend
+EnvironmentFile=/mnt/recordings/jetson-camera-service/.env
+Environment=JETSON_CAMERA_CONFIG=/mnt/recordings/jetson-camera-service/config/config.yaml
+ExecStart=/mnt/recordings/jetson-camera-service/backend/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+
+Restart=on-failure
+RestartSec=5
+# Aktif bir kayıt varsa RecordingManager.shutdown() SIGINT ile pipeline'ı
+# EOS'a çevirip dosyayı finalize etmeyi dener (bkz. Faz 3) - bu birkaç
+# saniye sürebilir, bu yüzden kısa bir stop timeout'u kaydı yarım kesebilir.
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jetson-camera-service
+
+# --- Güvenlik sertleştirme (hardening) ---
+# NoNewPrivileges=true KASITLI OLARAK KULLANILMIYOR: /api/service/restart-camera
+# uç noktası `sudo systemctl restart nvargus-daemon` çalıştırıyor (bkz.
+# api/service.py) ve sudo setuid bir binary'dir - NoNewPrivileges bunu
+# kırar. Bunun yerine en az yetki ilkesi jetcam kullanıcısına tanımlanan
+# DAR kapsamlı NOPASSWD sudoers kuralıyla (yalnızca bu tek komut)
+# sağlanıyor (bkz. install.sh).
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectHome=true
+ProtectClock=true
+ProtectKernelLogs=true
+
+[Install]
+WantedBy=multi-user.target

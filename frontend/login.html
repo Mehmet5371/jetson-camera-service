@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Giriş - Jetson Kamera Servisi</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="login-page">
+    <div class="card login-card">
+      <h1>Jetson Kamera Servisi</h1>
+      <div id="login-error" class="alert alert-error" style="display:none;"></div>
+      <form id="login-form">
+        <div class="form-row">
+          <label for="username">Kullanıcı Adı</label>
+          <input type="text" id="username" autocomplete="username" required />
+        </div>
+        <div class="form-row">
+          <label for="password">Parola</label>
+          <input type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+            Giriş yap
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    const form = document.getElementById("login-form");
+    const errorBox = document.getElementById("login-error");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.style.display = "none";
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        await Api.post("/api/auth/login", { username, password });
+        window.location.href = "/";
+      } catch (err) {
+        errorBox.textContent = err.message || "Giriş başarısız.";
+        errorBox.style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>

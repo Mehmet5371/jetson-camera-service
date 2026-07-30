@@ -1,0 +1,21 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+PyYAML==6.0.2
+SQLAlchemy==2.0.36
+sqlmodel==0.0.22
+alembic==1.14.0
+python-multipart==0.0.20
+aiofiles==24.1.0
+psutil==6.1.1
+passlib[argon2]==1.7.4
+python-jose[cryptography]==3.3.0
+# Yalnızca JPEG çözüp Laplacian varyansı hesaplamak için (otomatik odak
+# keskinlik analizi, bkz. camera/autofocus.py). GStreamer entegrasyonu
+# GEREKMEZ - sistem OpenCV'sinden (GStreamer destekli) BAĞIMSIZDIR, o
+# yüzden headless pip paketi yeterli.
+opencv-python-headless==5.0.0.93
+
+pytest==8.3.4
+pytest-asyncio==0.25.2
+httpx==0.28.1

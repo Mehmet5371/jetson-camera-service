@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jetson Kamera Servisi</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div id="connection-banner" class="alert alert-error" style="border-radius:0; margin-bottom:0; text-align:center;">
+    Sunucuya bağlanılamıyor. Bağlantı tekrar kurulmaya çalışılıyor...
+  </div>
+
+  <header class="app-header">
+    <h1>Jetson Kamera Servisi</h1>
+    <div class="user-info">
+      <span id="current-username"></span>
+      <button class="btn" id="logout-btn">Çıkış yap</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Ana Ekran</button>
+    <button class="tab-btn" data-tab="recordings">Kayıtlar</button>
+    <button class="tab-btn" data-tab="system">Sistem</button>
+    <button class="tab-btn" data-tab="settings">Ayarlar</button>
+    <button class="tab-btn" data-tab="logs">Loglar</button>
+  </nav>
+
+  <main>
+    <section id="tab-dashboard" class="tab-panel active">
+      <div id="dashboard-error" class="alert alert-error" style="display:none;"></div>
+
+      <div class="card">
+        <h2>Kamera &amp; Kayıt Durumu</h2>
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="label">Kayıt Durumu</div>
+            <div class="value"><span id="recording-state-badge" class="badge badge-idle">-</span></div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">Aktif Kayıt Süresi</div>
+            <div class="value" id="recording-duration">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">Aktif Dosya</div>
+            <div class="value" id="recording-filename" style="font-size:13px;">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">Anlık Dosya Boyutu</div>
+            <div class="value" id="recording-filesize">-</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="start-recording-btn">Kaydı Başlat</button>
+          <button class="btn btn-danger" id="stop-recording-btn">Kaydı Durdur</button>
+          <button class="btn" id="restart-camera-btn">Kamera Servisini Yeniden Başlat</button>
+          <button class="btn" id="refresh-status-btn">Durumu Yenile</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Canlı Önizleme &amp; Odak</h2>
+        <p class="text-muted" id="preview-locked-note" style="display:none;">
+          Kayıt sürerken önizleme kullanılamaz (kamera tek seferde tek işlem tarafından kullanılabilir).
+        </p>
+        <div id="preview-error" class="alert alert-error" style="display:none;"></div>
+        <div id="preview-container" style="display:none;">
+          <img id="preview-image" alt="Kamera önizlemesi" style="width:100%; border-radius:8px; background:#000;" />
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="preview-toggle-btn">Canlı Görüntüyü Aç</button>
+        </div>
+        <div id="focus-controls" style="display:none; margin-top:14px;">
+          <div class="form-row">
+            <label for="continuous-focus-toggle">
+              <input type="checkbox" id="continuous-focus-toggle" />
+              Sürekli Otomatik Odak
+            </label>
+            <p class="text-muted" id="continuous-focus-status">-</p>
+          </div>
+          <div class="form-row">
+            <label for="focus-slider">Manuel Odak: <span id="focus-value-label">-</span></label>
+            <input type="range" id="focus-slider" min="0" max="1000" step="10" value="250" />
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="autofocus-btn">Şimdi Odakla</button>
+            <span id="autofocus-status" class="text-muted"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sistem Kaynakları</h2>
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="label">CPU</div>
+            <div class="value" id="stat-cpu">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">RAM</div>
+            <div class="value" id="stat-ram">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">CPU Sıcaklığı</div>
+            <div class="value" id="stat-cpu-temp">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">GPU Sıcaklığı</div>
+            <div class="value" id="stat-gpu-temp">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">Depolama (SSD)</div>
+            <div class="value" id="stat-storage">-</div>
+          </div>
+          <div class="stat-tile">
+            <div class="label">Servis Çalışma Süresi</div>
+            <div class="value" id="stat-uptime">-</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-recordings" class="tab-panel">
+      <div class="card">
+        <div class="toolbar">
+          <input type="text" id="recordings-search" placeholder="Dosya adında ara..." />
+          <select id="recordings-status-filter">
+            <option value="">Tüm durumlar</option>
+            <option value="completed">completed</option>
+            <option value="corrupted">corrupted</option>
+            <option value="missing">missing</option>
+            <option value="failed">failed</option>
+          </select>
+          <button class="btn" id="recordings-refresh-btn">Yenile</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="filename">Dosya Adı</th>
+                <th data-sort="started_at">Tarih</th>
+                <th data-sort="duration_seconds">Süre</th>
+                <th data-sort="file_size_bytes">Boyut</th>
+                <th>Çözünürlük</th>
+                <th data-sort="status">Durum</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="recordings-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button class="btn" id="recordings-prev-btn">&larr; Önceki</button>
+          <span id="recordings-page-info">-</span>
+          <button class="btn" id="recordings-next-btn">Sonraki &rarr;</button>
+        </div>
+      </div>
+
+      <div class="card" id="recording-player-card" style="display:none;">
+        <h2 id="recording-player-title">Oynatılıyor</h2>
+        <video id="recording-player" controls></video>
+      </div>
+    </section>
+
+    <section id="tab-system" class="tab-panel">
+      <div class="card">
+        <h2>Sistem Bilgisi</h2>
+        <table>
+          <tbody id="system-info-tbody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Kamera Bilgisi</h2>
+        <table>
+          <tbody id="camera-info-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab-panel">
+      <div id="settings-message" class="alert" style="display:none;"></div>
+      <form id="settings-form">
+        <div class="card">
+          <h2>Kamera / Kayıt Ayarları</h2>
+          <p class="text-muted" id="settings-locked-note" style="display:none;">
+            Aktif bir kayıt sürerken bu ayarlar değiştirilemez.
+          </p>
+          <div class="form-grid">
+            <div class="form-row">
+              <label for="setting-width">Genişlik (px)</label>
+              <input type="number" id="setting-width" name="width" min="1" />
+            </div>
+            <div class="form-row">
+              <label for="setting-height">Yükseklik (px)</label>
+              <input type="number" id="setting-height" name="height" min="1" />
+            </div>
+            <div class="form-row">
+              <label for="setting-fps">FPS</label>
+              <input type="number" id="setting-fps" name="fps" min="1" />
+            </div>
+            <div class="form-row">
+              <label for="setting-bitrate">Bitrate (bps)</label>
+              <input type="number" id="setting-bitrate" name="bitrate_bps" min="1" />
+            </div>
+            <div class="form-row">
+              <label for="setting-segment">Segment Süresi (dk, 0=tek dosya)</label>
+              <input type="number" id="setting-segment" name="segment_duration_minutes" min="0" />
+            </div>
+            <div class="form-row">
+              <label for="setting-min-space">Minimum Boş Alan (GB)</label>
+              <input type="number" id="setting-min-space" name="minimum_free_space_gb" min="0" step="0.1" />
+            </div>
+            <div class="form-row">
+              <label for="setting-low-space-action">Disk Doluyken Davranış</label>
+              <select id="setting-low-space-action" name="low_space_action">
+                <option value="stop">stop</option>
+                <option value="delete_oldest">delete_oldest</option>
+                <option value="warn_only">warn_only</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="setting-filename-format">Dosya Adı Formatı (strftime)</label>
+              <input type="text" id="setting-filename-format" name="filename_format" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Saklama (Retention)</h2>
+          <div class="form-grid">
+            <div class="form-row">
+              <label for="setting-retention-enabled">Otomatik Eski Kayıt Silme</label>
+              <select id="setting-retention-enabled" name="retention_enabled">
+                <option value="false">Kapalı</option>
+                <option value="true">Açık</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="setting-retention-percent">Maksimum Disk Kullanımı (%)</label>
+              <input type="number" id="setting-retention-percent" name="maximum_storage_percent" min="1" max="100" />
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="tab-logs" class="tab-panel">
+      <div class="card">
+        <div class="toolbar">
+          <select id="logs-level-filter">
+            <option value="">Tüm seviyeler</option>
+            <option value="ERROR">ERROR</option>
+            <option value="WARNING">WARNING</option>
+            <option value="INFO">INFO</option>
+          </select>
+          <button class="btn" id="logs-refresh-btn">Yenile</button>
+          <a class="btn" id="logs-download-link" href="/api/logs/download">İndir</a>
+        </div>
+        <div id="logs-container"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="password-change-modal">
+    <div class="modal">
+      <h2>Parola Değiştirme Zorunlu</h2>
+      <p class="text-muted">Devam etmeden önce varsayılan parolayı değiştirmelisiniz.</p>
+      <div id="password-change-error" class="alert alert-error" style="display:none;"></div>
+      <form id="password-change-form">
+        <div class="form-row">
+          <label for="current-password">Mevcut Parola</label>
+          <input type="password" id="current-password" required />
+        </div>
+        <div class="form-row">
+          <label for="new-password">Yeni Parola (en az 8 karakter)</label>
+          <input type="password" id="new-password" minlength="8" required />
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Parolayı Değiştir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal">
+      <h2 id="confirm-modal-title">Emin misiniz?</h2>
+      <p id="confirm-modal-message" class="text-muted"></p>
+      <div class="btn-row">
+        <button class="btn btn-danger" id="confirm-modal-confirm-btn">Onayla</button>
+        <button class="btn" id="confirm-modal-cancel-btn">Vazgeç</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/format.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/recordings.js"></script>
+  <script src="/static/js/system.js"></script>
+  <script src="/static/js/settings.js"></script>
+  <script src="/static/js/logs.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

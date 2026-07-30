@@ -1,0 +1,18 @@
+[project]
+name = "jetson-camera-service"
+version = "0.1.0"
+description = "Jetson Orin Nano uzaktan kamera veri toplama servisi"
+requires-python = ">=3.10,<3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "hardware: gerçek kamera donanımına erişim gerektirir (CI'da atlanabilir)",
+]
+
+[tool.mypy]
+python_version = "3.10"
+disallow_untyped_defs = true
+ignore_missing_imports = true

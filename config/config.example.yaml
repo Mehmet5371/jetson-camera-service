@@ -1,0 +1,130 @@
+# jetson-camera-service yapılandırma dosyası
+# Kurulumda bu dosya config/config.yaml olarak kopyalanır ve düzenlenir.
+# config.yaml Git'e eklenmez (bkz. .gitignore).
+
+camera:
+  # auto: sistemde çalışan kamera altyapısını otomatik tespit eder
+  # argus: nvarguscamerasrc'a zorla
+  # v4l2: v4l2src'a zorla
+  # Bu donanımda (Arducam IMX519) yalnızca argus çalışır; v4l2src ham Bayer
+  # (RG10) formatını ISP olmadan sunduğu için kullanılamaz. auto bunu
+  # otomatik doğrular ve v4l2 seçilirse açık hata verir.
+  backend: auto
+  sensor_id: 0
+  device: /dev/video0
+  # Arducam VCM odak motorunun I2C bus'ı (sensörün kendisinden -0x1a- ayrı
+  # bir cihaz, adres 0x0c). Bu Jetson'da CAM0 portu için doğrulanmıştır.
+  i2c_bus: 10
+  width: 1920
+  height: 1080
+  fps: 30
+  # Otomatik odağın ANA şalteri (false = yalnızca manual_focus_value/slider).
+  autofocus: true
+  # autofocus false olduğunda kullanılacak sabit fokus değeri (0-1000,
+  # Arducam Focuser.py OPT_FOCUS aralığıyla aynı). Bu cihazda manuel testte
+  # ~250 net görüntü verdi; sabit çalışma mesafesi değişirse yeniden
+  # kalibre edilmeli.
+  manual_focus_value: 250
+  # Sürekli otomatik odak: canlı akış (önizleme VEYA kayıt) varken keskinlik
+  # sürekli ÖLÇÜLÜR, odak kaçtığında kendiliğinden yeniden odaklanır - hiçbir
+  # butona basmak gerekmez. Lens durmadan taranmaz (bu, görüntüyü/kaydı
+  # sürekli bulanıklaştırırdı); yalnızca gerçekten gerektiğinde odaklanır.
+  continuous_autofocus:
+    enabled: true
+    # Kayıt sırasında da çalışsın mı? true: sahne mesafesi değişirse kayıt net
+    # kalır (odaklama hareketi kayda da geçer). false: kayıt, önizlemede
+    # bulunan odakla sabit devam eder.
+    during_recording: true
+    # Keskinlik ölçüm sıklığı (saniye). Ölçüm ucuzdur: tek JPEG çözme +
+    # merkez %20 ROI'de Laplacian varyansı.
+    sample_interval_seconds: 0.5
+    # Referans keskinliğin bu katının altı "odak kaçtı" sayılır (0-1).
+    trigger_ratio: 0.7
+    # Referans, ölçümlerin üstel hareketli ortalamasıdır (EMA); bu katsayı ne
+    # kadar hızlı uyum sağladığını belirler. GERÇEK DONANIMDA ÖLÇÜLDÜ: aynı
+    # pozisyonda keskinliğin MUTLAK değeri zamanla kayıyor (ISP adaptasyonu +
+    # ışık), bu yüzden referans "görülen en yüksek değer" OLAMAZ.
+    reference_smoothing: 0.1
+    # Tek düşük ölçüm tetiklemez - üst üste bu kadar düşük ölçüm gerekir
+    # (keskinlik sahne içeriğine de bağlıdır, yanlış tetikleme istenmez).
+    consecutive_drops: 3
+    # İki yeniden odaklama arasındaki en kısa süre (lens'in gidip gelmesini,
+    # "hunting", önler).
+    cooldown_seconds: 6.0
+    # Yeniden odaklama önce mevcut pozisyonun çevresinde yerel arama yapar:
+    # ±(fine_step * fine_range_steps) = ±100.
+    fine_step: 25
+    fine_range_steps: 4
+    # Odaklama sonrası doğrulama ölçümü için bekleme (ISP'nin oturması) -
+    # sonuç belirgin şekilde kötüyse odak eski pozisyonuna geri alınır.
+    verify_settle_seconds: 1.0
+    # Akış ilk kez başladığında bir kez tam süpürme (0-1000) yap - sistem
+    # kullanıcı müdahalesi olmadan net görüntüyle başlar.
+    initial_sweep: true
+    # Manuel odak (slider) sonrası sürekli odağı bu kadar saniye duraklat.
+    # 0 = kullanıcı tekrar açana kadar duraklat.
+    manual_override_seconds: 30.0
+
+preview:
+  # Canlı önizleme (odak/çerçeveleme için) - kayıt çözünürlüğünden BİLEREK
+  # düşük tutulur (CPU/bant genişliği tasarrufu, kalite kritik değil).
+  # Yalnızca kayıt YOKKEN kullanılabilir (Argus tek-oturum kısıtlaması).
+  width: 960
+  height: 540
+  fps: 15
+  jpeg_quality: 75
+
+recording:
+  codec: h264
+  # Bu Jetson Orin Nano'da donanımsal video encoder (NVENC) YOK
+  # (yalnızca Orin NX / AGX Orin'de var). Bu yüzden encoder her zaman
+  # yazılımsal x264enc'tir; bu alan gelecekte donanım desteği eklenirse
+  # diye tutulur ama şu an "software" dışında bir değer kabul edilmez.
+  encoder: software
+  container: mp4
+  # Saniyedeki bit sayısı (bps). x264enc'in "bitrate" özelliği kbit/s
+  # beklediği için pipeline kurucusu bu değeri 1000'e bölerek kullanır.
+  bitrate_bps: 8000000
+  # x264enc speed-preset: ultrafast..veryslow. Daha yavaş preset = daha
+  # iyi sıkıştırma ama daha çok CPU. 6 çekirdekli Cortex-A78AE'de 1080p
+  # için ultrafast/superfast önerilir.
+  speed_preset: ultrafast
+  segment_duration_minutes: 30
+  filename_format: "%Y-%m-%d_%H-%M-%S"
+  minimum_free_space_gb: 5
+  # stop: kaydı durdur, delete_oldest: en eski kayıtları sil, warn_only: sadece uyar
+  low_space_action: stop
+
+capture:
+  # Model eğitimi için tekil fotoğraf/anlık görüntü yakalama ayarları
+  photo_format: jpg
+  photo_quality: 95
+
+storage:
+  mount_path: /mnt/recordings
+  # Beklenen disk UUID'i (boş bırakılırsa kontrol edilmez). Bu cihazda
+  # doğrulanan SSD UUID'i varsayılan olarak yazılmıştır.
+  expected_uuid: "8214c9e1-8b27-4178-a294-377197d3fb05"
+  require_mountpoint: true
+  media_path: /mnt/recordings/media
+  video_path: /mnt/recordings/media/videos
+  photo_path: /mnt/recordings/media/photos
+  database_path: /mnt/recordings/db/app.db
+
+retention:
+  enabled: false
+  maximum_storage_percent: 90
+  delete_oldest_files: false
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+security:
+  authentication_enabled: true
+
+logging:
+  level: INFO
+  directory: /mnt/recordings/jetson-camera-service/logs
+  max_bytes: 10485760
+  backup_count: 5
