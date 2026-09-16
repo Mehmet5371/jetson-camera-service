@@ -37,7 +37,19 @@ SyslogIdentifier=jetson-camera-service
 # DAR kapsamlı NOPASSWD sudoers kuralıyla (yalnızca bu tek komut)
 # sağlanıyor (bkz. install.sh).
 NoNewPrivileges=false
-PrivateTmp=true
+# PrivateTmp KASITLI OLARAK KAPALI: Argus istemci kütüphanesi
+# nvargus-daemon'a /tmp/argus_socket üzerinden bağlanır. PrivateTmp=true
+# servise boş, özel bir /tmp ad alanı verir - soket görünmez olur ve CSI
+# kamera (bu donanımda tek çalışan yol olan nvarguscamerasrc, bkz.
+# camera/detector.py) açılmaz. Üstelik detector'ın kullanılabilirlik
+# kontrolü yalnızca `systemctl is-active nvargus-daemon` baktığı için
+# kamera "hazır" raporlanır ve hata ancak kayıt/önizleme başlarken
+# ortaya çıkar - teşhisi zor bir arıza.
+#
+# BindPaths=/tmp/argus_socket ile PrivateTmp korunabilirdi, ama
+# /api/service/restart-camera nvargus-daemon'ı yeniden başlatınca soket
+# yeniden oluşturulur ve bind mount eski inode'a bakmaya devam eder.
+PrivateTmp=false
 ProtectHome=true
 ProtectClock=true
 ProtectKernelLogs=true
